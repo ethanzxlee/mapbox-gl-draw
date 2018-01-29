@@ -83,6 +83,12 @@ location.hash.replace(/^#/,'').split('/').reduce(function(args, val, i, hash){
   var Draw = window.Draw = new MapboxDraw();
   var drawIsActive = true;
   map.addControl(Draw, 'bottom-right');
+  
+  map.on('styledata', function() {
+    map.removeControl(Draw);
+    // console.log('styledata')
+  });
+
 
   map.on('load', function() {
 

@@ -6,16 +6,20 @@ const Constants = require('./constants');
 module.exports = function(ctx) {
 
   let controlContainer = null;
+  let intervalId = null;
 
   const setup = {
     onRemove: function() {
-      setup.removeLayers();
-      ctx.store.restoreMapConfig();
-      ctx.ui.removeButtons();
-      ctx.events.removeEventListeners();
-      ctx.map = null;
-      ctx.container = null;
-      ctx.store = null;
+      if (ctx.map) {
+        ctx.map.off('load', setup.connect);
+        setup.removeLayers();
+        ctx.store.restoreMapConfig();
+        ctx.ui.removeButtons();
+        ctx.events.removeEventListeners();
+        ctx.map = null;
+        ctx.container = null;
+        ctx.store = null;
+      }
 
       if (controlContainer && controlContainer.parentNode) controlContainer.parentNode.removeChild(controlContainer);
       controlContainer = null;
@@ -29,7 +33,6 @@ module.exports = function(ctx) {
       ctx.container = map.getContainer();
       ctx.store = new Store(ctx);
 
-
       controlContainer = ctx.ui.addButtons();
 
       if (ctx.options.boxSelect) {
@@ -40,25 +43,27 @@ module.exports = function(ctx) {
         map.dragPan.enable();
       }
 
-      let intervalId = null;
-
-      const connect = () => {
-        map.off('load', connect);
-        clearInterval(intervalId);
-        setup.addLayers();
-        ctx.store.storeMapConfig();
-        ctx.events.addEventListeners();
-      };
-
       if (map.loaded()) {
-        connect();
+        setup.connect();
       } else {
-        map.on('load', connect);
-        intervalId = setInterval(() => { if (map.loaded()) connect(); }, 16);
+        map.on('load', setup.connect);
+        intervalId = setInterval(() => { if (map.loaded()) setup.connect(); }, 16);
       }
 
       ctx.events.start();
       return controlContainer;
+    },
+    connect: function() {
+      if (ctx.map) {
+        ctx.map.off('load', setup.connect);
+      }
+      clearInterval(intervalId);
+
+      if (ctx.map) {
+        setup.addLayers();
+        ctx.store.storeMapConfig();
+        ctx.events.addEventListeners();
+      }
     },
     addLayers: function() {
       // drawn features style
@@ -87,11 +92,18 @@ module.exports = function(ctx) {
     },
     removeLayers: function() {
       ctx.options.styles.forEach(style => {
-        ctx.map.removeLayer(style.id);
+        if (ctx.map.getLayer(style.id)) {
+          ctx.map.removeLayer(style.id);
+        }
       });
 
-      ctx.map.removeSource(Constants.sources.COLD);
-      ctx.map.removeSource(Constants.sources.HOT);
+      if (ctx.map.getSource(Constants.sources.COLD)) {
+        ctx.map.removeSource(Constants.sources.COLD);
+      }
+
+      if (ctx.map.getSource(Constants.sources.HOT)) {
+        ctx.map.removeSource(Constants.sources.HOT);
+      }
     }
   };
 
